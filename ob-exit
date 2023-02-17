@@ -1,6 +1,6 @@
 #!/usr/local/bin/bash
 
-# Requires x11/xvinfo, x11/xprop, x11/xdotool and x11/wmctrl
+# Requires x11/xvinfo, x11/xprop, x11/xdotool, x11/wmctrl, sysutils/dunst
 # Needs to set up security/sudo or security/doas to execute shutdown without password
 
 EXIT_COMMAND="openbox --exit"
