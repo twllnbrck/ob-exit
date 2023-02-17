@@ -1,0 +1,70 @@
+#!/usr/local/bin/bash
+
+# Requires x11/xvinfo, x11/xprop, x11/xdotool and x11/wmctrl
+# Needs to set up security/sudo or security/doas to execute shutdown without password
+
+EXIT_COMMAND="openbox --exit"
+#EXIT_COMMAND="lxpanelctl exit"
+TIME_TO_WAIT=10
+SLEEP="0.25"
+
+PATH=/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin:/root/bin:/opt/bin:/opt/sbin
+ACTION=$1
+NUM_DISPLAYS=`xvinfo | grep 'screen #' | wc -l`
+
+CUR_DISPLAY=0
+while [ $CUR_DISPLAY -lt $NUM_DISPLAYS ]; do
+	export DISPLAY=":0.$CUR_DISPLAY"
+
+	NUM_DESKS=`xdotool get_num_desktops`
+	CUR_DESK=0
+	while [ $CUR_DESK -lt $NUM_DESKS ]; do
+		xdotool set_desktop $CUR_DESK
+
+		CLIENTS=""
+		WINDOWS=`xprop -root _NET_CLIENT_LIST | awk -F# '{ print $2; }' | tr -d ","`
+		for ID in $WINDOWS; do
+			WINDOW_TYPE=`xprop -id $ID _NET_WM_WINDOW_TYPE`
+			TYPE_NOT_SET=`echo $WINDOW_TYPE | grep "not found" | wc -l`
+			TYPE_NORMAL=`echo $WINDOW_TYPE | grep _NET_WM_WINDOW_TYPE_NORMAL | wc -l`
+			if [ $TYPE_NOT_SET -eq 1 -o $TYPE_NORMAL -eq 1 ]; then
+				CLIENTS="$CLIENTS $ID"
+			fi
+		done
+
+		if [ -n "$CLIENTS" ]; then
+			for ID in $CLIENTS; do
+				wmctrl -ia $ID
+				sleep $SLEEP
+				wmctrl -ic $ID
+
+				TIME=`date +%s`
+				while [ `date +%s` -le `expr $TIME + $TIME_TO_WAIT` ]; do
+					sleep $SLEEP
+					if [ `xprop -root _NET_CLIENT_LIST | grep "$ID" | wc -l` -eq 0 ]; then
+						break
+					fi
+				done
+			done
+		fi
+
+		CUR_DESK=`expr $CUR_DESK + 1`
+	done
+
+	CUR_DISPLAY=`expr $CUR_DISPLAY + 1`
+done
+
+export DISPLAY=":0.0"
+
+case $ACTION in
+-r)
+	dunstify "Rebooting ..." && shutdown -r now
+	;;
+-p)
+	dunstify "Shutting down ..." && shutdown -p now
+	;;
+*)
+	dunstify "Switch to tty ..." && sleep 3 && $EXIT_COMMAND 
+	;;
+esac
+
